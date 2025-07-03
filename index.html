@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Typing Game Japanglish</title>
+  <style>
+    body {
+      background: #111;
+      color: white;
+      font-family: sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    #game {
+      position: relative;
+      width: 800px;
+      height: 65px;
+      margin: 30px auto;
+      border: 2px solid white;
+      background-color: #222;
+      overflow: hidden;
+    }
+
+    .enemy {
+      position: absolute;
+      top: 10px;
+      left: 0;
+      font-size: 32px;
+      white-space: nowrap;
+    }
+
+    .char {
+      display: inline-block;
+      color: red;
+    }
+
+    .hit {
+      color: white;
+      animation: explode 0.4s forwards;
+    }
+
+    @keyframes explode {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(2); opacity: 0.9; }
+      100% { transform: scale(3); opacity: 0; }
+    }
+
+    #score, #hp, #stageName {
+      font-size: 16px;
+      margin-top: 10px;
+    }
+
+    #hint {
+      font-size: 14px;
+      color: #aaa;
+      margin-top: 10px;
+      white-space: pre-line;
+      height: 40px;
+    }
+
+    #input {
+      font-size: 24px;
+      padding: 5px 10px;
+      width: 300px;
+      margin-top: 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+
+   #startBtn {
+      font-size: 20px;
+      padding: 10px 20px;
+      background-color: #0a0;
+      border: none;
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+      display: block;
+      margin: 10px auto 0 auto; /* 上マージン10px、左右中央 */
+      position: static; /* 位置指定解除 */
+    }
+  
+
+    #gameOver {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 36px;
+      font-weight: bold;
+      color: red;
+      display: none;
+      z-index: 10;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <h1>Typing Game Japanglish</h1>
+  <div id="stageName"></div>
+  <div id="game">
+    <div id="enemy" class="enemy"></div>
+    <div id="gameOver">GAME OVER</div>
+  </div>
+
+  <div id="hint"></div>
+  <input type="text" id="input" placeholder="Type here" disabled autocomplete="off" />
+  <div id="imeWarning" style="font-size: 13px; color: #f88; margin-top: 5px;">
+  ※キーボードが「かな」入力だと反応しません。半角英字にしてください。<br>
+  Please type in half-width English characters.
+  </div>
+  <div id="score">Score: 0</div>
+  <div id="hp">HP: 3</div>
+  <button id="startBtn">START</button>
+  
+
+  <audio id="typeSound" src="type.mp3" preload="auto"></audio>
+  <audio id="gunSound" src="gun.mp3" preload="auto"></audio>
+
+  <script>
+    (() => {
+      const stages = [
+        [ // Stage 1
+          { word: "sukiyaki", jp: "すき焼き（日本の鍋料理）", en: "Sukiyaki (Japanese hot pot dish)" },
+          { word: "tempura", jp: "天ぷら（揚げ物料理）", en: "Tempura (deep-fried dish)" },
+          { word: "sushi", jp: "寿司（酢飯と魚）", en: "Sushi (vinegared rice with fish)" },
+          { word: "ramen", jp: "ラーメン（日本の麺料理）", en: "Ramen (Japanese noodle soup)" },
+          { word: "udon", jp: "うどん（太い小麦麺）", en: "Udon (thick wheat noodles)" },
+          { word: "soba", jp: "そば（そば粉の麺）", en: "Soba (buckwheat noodles)" },
+          { word: "miso", jp: "味噌（発酵調味料）", en: "Miso (fermented seasoning)" },
+          { word: "yakitori", jp: "焼き鳥（串焼き鶏肉）", en: "Yakitori (grilled chicken skewer)" },
+          { word: "natto", jp: "納豆（発酵した大豆）", en: "Natto (fermented soybeans)" },
+          { word: "nori", jp: "海苔（乾燥した海藻）", en: "Nori (dried seaweed)" },
+          { word: "wasabi", jp: "わさび（辛味の薬味）", en: "Wasabi (spicy condiment)" },
+          { word: "bento", jp: "弁当（持ち運び用の食事）", en: "Bento (packed meal)" },
+          { word: "sake", jp: "酒（日本の米の酒）", en: "Sake (rice wine)" }
+        ],
+        [ // Stage 2
+          { word: "karate", jp: "空手（武道の一種）", en: "Karate (martial art)" },
+          { word: "judo", jp: "柔道（投げ技中心の武道）", en: "Judo (throwing martial art)" },
+          { word: "kendo", jp: "剣道（竹刀の武道）", en: "Kendo (bamboo sword martial art)" },
+          { word: "aikido", jp: "合気道（力を使わず制する武道）", en: "Aikido (defensive martial art)" },
+          { word: "sumo", jp: "相撲（日本の格闘技）", en: "Sumo (Japanese wrestling)" },
+          { word: "bushido", jp: "武士道（侍の道徳）", en: "Bushido (samurai code of honor)" },
+          { word: "samurai", jp: "侍（武士）", en: "Samurai (Japanese warrior)" },
+          { word: "ninja", jp: "忍者（隠密戦士）", en: "Ninja (stealth warrior)" },
+          { word: "katana", jp: "刀（日本の剣）", en: "Katana (Japanese sword)" },
+          { word: "kabuki", jp: "歌舞伎（伝統演劇）", en: "Kabuki (traditional theater)" },
+          { word: "haiku", jp: "俳句（短い詩）", en: "Haiku (short poem)" },
+          { word: "bonsai", jp: "盆栽（小さな鉢植えの木）", en: "Bonsai (miniature potted tree)" },
+          { word: "zen", jp: "禅（仏教の一派）", en: "Zen (Buddhist philosophy)" }
+        ],
+        [ // Stage 3
+          { word: "anime", jp: "アニメ（日本のアニメーション）", en: "Anime (Japanese animation)" },
+          { word: "manga", jp: "漫画（日本のコミック）", en: "Manga (Japanese comics)" },
+          { word: "kawaii", jp: "かわいい（可愛らしい）", en: "Kawaii (cute)" },
+          { word: "otaku", jp: "オタク（熱狂的ファン）", en: "Otaku (enthusiastic fan)" },
+          { word: "karaoke", jp: "カラオケ（伴奏に合わせて歌う）", en: "Karaoke (sing-along entertainment)" },
+          { word: "omakase", jp: "おまかせ（料理選びを任せる）", en: "Omakase (chef's choice)" },
+          { word: "mottainai", jp: "もったいない（無駄を惜しむ心）", en: "Mottainai (waste-not spirit)" },
+          { word: "emoji", jp: "絵文字（デジタルコミュニケーションで使われる小さなアイコン）", en: "Emoji (small icons used in digital communication)" },
+          { word: "kimono", jp: "着物（日本の伝統衣装）", en: "Kimono (traditional clothing)" },
+          { word: "tatami", jp: "畳（わら製の床材）", en: "Tatami (straw mat flooring)" },
+          { word: "origami", jp: "折り紙（紙を折って作る遊び）", en: "Origami (paper folding art)" },
+          { word: "matcha", jp: "抹茶（粉末緑茶）", en: "Matcha (powdered green tea)" },
+          { word: "kintsugi", jp: "金継ぎ（壊れた器を金で修復）", en: "Kintsugi (gold joinery repair art)" }
+        ]
+      ];
+
+            const enemy = document.getElementById("enemy");
+      const input = document.getElementById("input");
+      const scoreDisplay = document.getElementById("score");
+      const hpDisplay = document.getElementById("hp");
+      const hint = document.getElementById("hint");
+      const startBtn = document.getElementById("startBtn");
+      const gameOverDisplay = document.getElementById("gameOver");
+      const stageNameDisplay = document.getElementById("stageName");
+
+      const typeSound = document.getElementById("typeSound");
+      const gunSound = document.getElementById("gunSound");
+
+      let currentStage = 0;
+      let stageWords = [];
+      let usedWords = [];
+      let currentWordObj = null;
+      let currentWord = "";
+      let currentIndex = 0;
+      let score = 0;
+      let hp = 3;
+      let enemyX = 0;
+      let animationFrameId = null;
+
+      function startGame() {
+        currentStage = 0;
+        score = 0;
+        startStage();
+      }
+
+      function startStage() {
+        hp = 3;
+        updateHp();
+        updateScore();
+        gameOverDisplay.style.display = "none";
+        input.disabled = false;
+        input.value = "";
+        input.focus();
+        stageWords = [...stages[currentStage]];
+        usedWords = [];
+        setStageName(currentStage);
+        startBtn.style.display = "none";
+        nextWord();
+        moveEnemyLoop();
+      }
+
+      function setStageName(stageIndex) {
+        const names = ["Food & Life", "Martial Arts & Tradition", "Culture"];
+        stageNameDisplay.textContent = `STAGE ${stageIndex + 1}: ${names[stageIndex]}`;
+      }
+
+      function updateScore() {
+        scoreDisplay.textContent = "Score: " + score;
+      }
+
+      function updateHp() {
+        hpDisplay.textContent = "HP: " + hp;
+      }
+
+      function renderWord(word) {
+        enemy.innerHTML = "";
+        for (let char of word) {
+          const span = document.createElement("span");
+          span.textContent = char;
+          span.classList.add("char");
+          enemy.appendChild(span);
+        }
+      }
+
+      function moveEnemyLoop() {
+        cancelAnimationFrame(animationFrameId);
+        function move() {
+          const speed = 1.5 + currentStage * 0.7;
+          enemyX += speed;
+          enemy.style.left = enemyX + "px";
+          if (enemyX > 760) {
+            gunSound.currentTime = 0;
+            gunSound.play();
+            hp--;
+            updateHp();
+            if (hp <= 0) {
+              showGameOver();
+              return;
+            } else {
+              nextWord();
+            }
+          } else {
+            animationFrameId = requestAnimationFrame(move);
+          }
+        }
+        move();
+      }
+
+      function nextWord() {
+        cancelAnimationFrame(animationFrameId);
+        if (stageWords.length === 0) {
+          currentStage++;
+          if (currentStage >= stages.length) {
+            showGameOver(true); // 全ステージクリア
+          } else {
+            startBtn.textContent = "NEXT STAGE";
+            startBtn.style.display = "block";
+            input.disabled = true;
+          }
+          return;
+        }
+        currentIndex = 0;
+        enemyX = 0;
+        enemy.style.left = "0px";
+        const randIndex = Math.floor(Math.random() * stageWords.length);
+        currentWordObj = stageWords.splice(randIndex, 1)[0];
+        currentWord = currentWordObj.word;
+        usedWords.push(currentWord);
+        renderWord(currentWord);
+        showHint(currentWordObj);
+        moveEnemyLoop();
+      }
+
+      function showHint(obj) {
+        hint.textContent = `${obj.jp}\n${obj.en}`;
+      }
+
+      function hitChar(index) {
+        const chars = enemy.querySelectorAll(".char");
+        if (chars[index]) {
+          chars[index].classList.add("hit");
+        }
+        typeSound.currentTime = 0;
+        typeSound.play();
+      }
+
+      function showGameOver(cleared = false) {
+        cancelAnimationFrame(animationFrameId);
+        input.disabled = true;
+        gameOverDisplay.textContent = cleared ? "CONGRATULATIONS!" : "GAME OVER";
+        gameOverDisplay.style.display = "block";
+        startBtn.textContent = "RESTART";
+        startBtn.style.display = "block";
+      }
+
+      input.addEventListener("input", () => {
+        if (input.value.length === 0) return;
+        const char = input.value[input.value.length - 1].toLowerCase();
+        if (char === currentWord[currentIndex]) {
+          hitChar(currentIndex);
+          currentIndex++;
+          score++;
+          updateScore();
+          if (currentIndex >= currentWord.length) {
+            nextWord();
+          }
+        }
+        input.value = "";
+      });
+
+      startBtn.addEventListener("click", () => {
+        if (startBtn.textContent === "START" || startBtn.textContent === "RESTART") {
+          startGame();
+        } else if (startBtn.textContent === "NEXT STAGE") {
+          startStage();
+        }
+      });
+
+      input.disabled = true;
+    })();
+  </script>
+</body>
+</html>
